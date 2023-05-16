@@ -5,6 +5,7 @@ const global = {
 		type: '',
 		page: 1,
 		totalPages: 1,
+		totalResults: 0,
 	},
 	api: {
 		apiKey: '157d48dcf9eb2e4fa6cf6f014980e9da',
@@ -231,7 +232,11 @@ async function search() {
 	global.search.term = urlParams.get('search-term');
 
 	if (global.search.term !== '' && global.search.term !== null) {
-		const { results, total_pages, page } = await searchAPIData();
+		const { results, total_pages, page, total_results } = await searchAPIData();
+
+		global.search.page = page;
+		global.search.totalPages = total_pages;
+		global.search.totalResults = total_results;
 
 		if (results.length === 0) {
 			showAlert('No results found');
@@ -247,6 +252,11 @@ async function search() {
 }
 
 function dispalySearchResults(results) {
+	// Clear Previous Results
+	document.querySelector('#search-results').innerHTML = '';
+	document.querySelector('#search-results-heading').innerHTML = '';
+	document.querySelector('#pagination').innerHTML = '';
+
 	results.forEach((result) => {
 		const div = document.createElement('div');
 		div.classList.add('card');
@@ -273,7 +283,54 @@ function dispalySearchResults(results) {
             </p>
           </div>
           `;
+
+		document.querySelector('#search-results-heading').innerHTML = `
+			<h2>${results.length} of ${global.search.totalResults} Results for ${global.search.term}</h2>
+		`;
+
 		document.querySelector('#search-results').appendChild(div);
+	});
+
+	displayPagination();
+}
+
+// Create & Display Pagination For Search
+
+function displayPagination() {
+	const div = document.createElement('div');
+	div.classList.add('pagination');
+	div.innerHTML = `
+			<button class="btn btn-primary" id="prev">Prev</button>
+			<button class="btn btn-primary" id="next">Next</button>
+			<div class="page-counter">Page ${global.search.page} of ${global.search.totalPages}</div>
+	`;
+
+	document.querySelector('#pagination').appendChild(div);
+
+	// Disable Prev Button IF On First Page
+	if (global.search.page === 1) {
+		document.querySelector('#prev').disabled = true;
+	}
+
+	// Disable Next Button If On Last Page
+	if (global.search.page === global.search.totalPages) {
+		document.querySelector('#next').disabled = true;
+	}
+
+	// Next Page
+	document.querySelector('#next').addEventListener('click', async () => {
+		global.search.page++;
+		const { results, total_pages } = await searchAPIData();
+
+		dispalySearchResults(results);
+	});
+
+	// Previous Page
+	document.querySelector('#prev').addEventListener('click', async () => {
+		global.search.page--;
+		const { results, total_pages } = await searchAPIData();
+
+		dispalySearchResults(results);
 	});
 }
 
@@ -347,7 +404,9 @@ async function searchAPIData() {
 
 	showSpinner();
 
-	const res = await fetch(`${API_URl}search/${global.search.type}?api_key=${API_KEY}&language=en-US&query=${global.search.term}`);
+	const res = await fetch(
+		`${API_URl}search/${global.search.type}?api_key=${API_KEY}&language=en-US&query=${global.search.term}&page=${global.search.page}`
+	);
 	const data = await res.json();
 
 	hideSpinner();
